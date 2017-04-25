@@ -26,9 +26,12 @@
 #include "ImAcq.h"
 #include "Gui.h"
 
+#include "pthread.h"
+
 using tld::Config;
 using tld::Gui;
 using tld::Settings;
+
 
 int main(int argc, char **argv)
 {

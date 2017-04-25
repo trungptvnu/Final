@@ -24,6 +24,9 @@
  */
 
 #include <iostream>
+#include <cstdlib>
+#include <pthread.h>
+
 
 #include "Main.h"
 
@@ -40,8 +43,11 @@ using namespace cv;
 void Main::doWork()
 {
 	Trajectory trajectory;
+
     IplImage *img = imAcqGetImg(imAcq);
+
     Mat grey(img->height, img->width, CV_8UC1);
+
     cvtColor(cvarrToMat(img), grey, CV_BGR2GRAY);
 
     tld->detectorCascade->imgWidth = grey.cols;
@@ -51,6 +57,11 @@ void Main::doWork()
     _tld->detectorCascade->imgWidth = grey.cols;
     _tld->detectorCascade->imgHeight = grey.rows;
     _tld->detectorCascade->imgWidthStep = grey.step;
+
+    _tld1->detectorCascade->imgWidth = grey.cols;
+    _tld1->detectorCascade->imgHeight = grey.rows;
+    _tld1->detectorCascade->imgWidthStep = grey.step;
+
 
 
 
@@ -78,6 +89,46 @@ void Main::doWork()
         initialBB[1] = box.y;
         initialBB[2] = box.width;
         initialBB[3] = box.height;
+        
+        // Lan 2
+
+        CvRect box1;
+
+        if(getBBFromUser(img, box1, gui) == PROGRAM_EXIT)
+        {
+            return;
+        }
+
+        if(initialBB1 == NULL)
+        {
+            initialBB1 = new int[4];
+        }
+
+        initialBB1[0] = box1.x;
+        initialBB1[1] = box1.y;
+        initialBB1[2] = box1.width;
+        initialBB1[3] = box1.height;
+
+        // Lan 3
+
+        CvRect box2;
+
+        if(getBBFromUser(img, box2, gui) == PROGRAM_EXIT)
+        {
+            return;
+        }
+
+        if(initialBB2 == NULL)
+        {
+            initialBB2 = new int[4];
+        }
+
+        initialBB2[0] = box2.x;
+        initialBB2[1] = box2.y;
+        initialBB2[2] = box2.width;
+        initialBB2[3] = box2.height;
+
+
     }
 
     FILE *resultsFile = NULL;
@@ -99,17 +150,28 @@ void Main::doWork()
     {
         tld->readFromFile(modelPath);
         _tld->readFromFile(modelPath);
-
+        _tld1->readFromFile(modelPath);
         reuseFrameOnce = true;
     }
-    else if(initialBB != NULL)
+     else if(initialBB != NULL || (initialBB1 != NULL ) || (initialBB2 != NULL ))
+    //  else if(initialBB != NULL )
+    
+
     {
         Rect bb = tldArrayToRect(initialBB);
+          Rect bb1 = tldArrayToRect(initialBB);
+           Rect bb2 = tldArrayToRect(initialBB);
+
 
         printf("Starting at %d %d %d %d\n", bb.x, bb.y, bb.width, bb.height);
+        printf("Starting at %d %d %d %d\n", bb1.x, bb1.y, bb1.width, bb1.height);
+        printf("Starting at %d %d %d %d\n", bb2.x, bb2.y, bb2.width, bb2.height);
+
 
         tld->selectObject(grey, &bb);
         _tld->selectObject(grey, &bb);
+         _tld1->selectObject(grey, &bb);
+
 
         skipProcessingOnce = true;
         reuseFrameOnce = true;
@@ -137,6 +199,8 @@ void Main::doWork()
         {
             tld->processImage(cvarrToMat(img));
             _tld->processImage(cvarrToMat(img));
+            _tld1->processImage(cvarrToMat(img));
+            
         }
         else
         {
@@ -145,10 +209,11 @@ void Main::doWork()
 
         if(printResults != NULL)
         {
-            if((tld->currBB) != NULL || (_tld ->currBB))
+            if((tld->currBB) != NULL || (_tld ->currBB) || (_tld1 ->currBB) )
             {
                 fprintf(resultsFile, "%d %.2d %.2d %.2d %.2d %f\n", imAcq->currentFrame - 1, tld->currBB->x, tld->currBB->y, tld->currBB->width, tld->currBB->height, tld->currConf);
                 fprintf(resultsFile, "%d %.2d %.2d %.2d %.2d %f\n", imAcq->currentFrame - 1, _tld->currBB->x, _tld->currBB->y, _tld->currBB->width, _tld->currBB->height, _tld->currConf);
+                fprintf(resultsFile, "%d %.2d %.2d %.2d %.2d %f\n", imAcq->currentFrame - 1, _tld1->currBB->x, _tld1->currBB->y, _tld1->currBB->width, _tld1->currBB->height, _tld1->currConf);
             }
             else
             {
@@ -162,8 +227,10 @@ void Main::doWork()
 
         float fps = 1 / toc;
 
-        int confident = (tld->currConf >= threshold) ? 1 : 0;
-        int _confient = (_tld->currConf >= threshold) ? 1 : 0;
+         int confident = (tld->currConf >= threshold) ? 1 : 0;
+        // // int confiden1 = (_tld->currConf >= threshold) ? 1 : 0;
+        // // int confident2 = (_tld1->currConf >= threshold) ? 1 : 0;
+        
 
         if(showOutput || saveDir != NULL)
         {
@@ -171,33 +238,52 @@ void Main::doWork()
 
             char learningString[10] = "";
 
-            if(tld->learning || _tld ->learning)
             {
                 strcpy(learningString, "Learning");
             }
 
             sprintf(string, "#%d,Posterior %.2f; fps: %.2f, #numwindows:%d, %s", imAcq->currentFrame - 1, tld->currConf, fps, tld->detectorCascade->numWindows, learningString);
             sprintf(string, "#%d,Posterior %.2f; fps: %.2f, #numwindows:%d, %s", imAcq->currentFrame - 1, _tld->currConf, fps, _tld->detectorCascade->numWindows, learningString);
+            sprintf(string, "#%d,Posterior %.2f; fps: %.2f, #numwindows:%d, %s", imAcq->currentFrame - 1, _tld1->currConf, fps, _tld1->detectorCascade->numWindows, learningString);
+            
             CvScalar yellow = CV_RGB(255, 255, 0);
             CvScalar blue = CV_RGB(0, 0, 255);
             CvScalar black = CV_RGB(0, 0, 0);
             CvScalar white = CV_RGB(255, 255, 255);
 // .................
-            if((_tld->currBB != NULL) || (tld->currBB != NULL ))
+            if((_tld->currBB != NULL) || (tld->currBB != NULL ) || (_tld1->currBB != NULL ))
             {
                 CvScalar rectangleColor = (confident) ? blue : yellow;
+
                 cvRectangle(img, tld->currBB->tl(), tld->currBB->br(), rectangleColor, 8, 8, 0);
-
-                cout <<" helllllo " << endl;
-
                 cvRectangle(img, _tld->currBB->tl(), _tld->currBB->br(), rectangleColor, 8, 8, 0);
+                cvRectangle(img, _tld1->currBB->tl(), _tld1->currBB->br(), rectangleColor, 8, 8, 0);
+                
 
 				if(showTrajectory)
 				{
 					CvPoint center = cvPoint(tld->currBB->x + tld->currBB->width/2, tld->currBB->y + tld->currBB->height/2);
 					cvLine(img, cvPoint(center.x-2, center.y-2), cvPoint(center.x+2, center.y+2), rectangleColor, 2);
 					cvLine(img, cvPoint(center.x-2, center.y+2), cvPoint(center.x+2, center.y-2), rectangleColor, 2);
+
+					
+
+                    CvPoint center1 = cvPoint(_tld->currBB->x + _tld->currBB->width/2, _tld->currBB->y + _tld->currBB->height/2);
+					cvLine(img, cvPoint(center1.x-2, center1.y-2), cvPoint(center1.x+2, center1.y+2), rectangleColor, 2);
+					cvLine(img, cvPoint(center1.x-2, center1.y+2), cvPoint(center1.x+2, center1.y-2), rectangleColor, 2);
+					
+
+                    CvPoint center11 = cvPoint(_tld1->currBB->x + _tld1->currBB->width/2, _tld1->currBB->y + _tld1->currBB->height/2);
+					cvLine(img, cvPoint(center11.x-2, center1.y-2), cvPoint(center11.x+2, center11.y+2), rectangleColor, 2);
+					cvLine(img, cvPoint(center11.x-2, center1.y+2), cvPoint(center11.x+2, center11.y-2), rectangleColor, 2);
+					
+					
 					trajectory.addPoint(center, rectangleColor);
+					trajectory.addPoint(center1, rectangleColor);
+					trajectory.addPoint(center11, rectangleColor);
+
+                    
+
 				}
             }
 			else if(showTrajectory)
@@ -215,12 +301,29 @@ void Main::doWork()
             cvRectangle(img, cvPoint(0, 0), cvPoint(img->width, 50), black, CV_FILLED, 8, 0);
             cvPutText(img, string, cvPoint(25, 25), &font, white);
 
+            cout <<" heloo world" << endl;
+
+
+/// adjfhasdlkf  fix code
+
             if(showForeground)
             {
+
+                for(size_t i = 0; i < tld->detectorCascade->detectionResult->fgList->size(); i++)
+                {
+                    Rect r = tld->detectorCascade->detectionResult->fgList->at(i);
+                    cvRectangle(img, r.tl(), r.br(), white, 1);
+                }
 
                 for(size_t i = 0; i < _tld->detectorCascade->detectionResult->fgList->size(); i++)
                 {
                     Rect r = _tld->detectorCascade->detectionResult->fgList->at(i);
+                    cvRectangle(img, r.tl(), r.br(), white, 1);
+                }
+
+                for(size_t i = 0; i < _tld1->detectorCascade->detectionResult->fgList->size(); i++)
+                {
+                    Rect r = _tld1->detectorCascade->detectionResult->fgList->at(i);
                     cvRectangle(img, r.tl(), r.br(), white, 1);
                 }
 
@@ -261,39 +364,28 @@ void Main::doWork()
                     printf("LearningEnabled: %d\n", tld->learningEnabled);
                 }
 
-                if(key == 'a')
-                {
-                    tld->alternating = !tld->alternating;
-                    printf("alternating: %d\n", tld->alternating);
-                }
-
-                if(key == 'e')
-                {
-                    tld->writeToFile(modelExportFile);
-                }
-
-                if(key == 'i')
-                {
-                    tld->readFromFile(modelPath);
-                }
-
                 if(key == 'r')
                 {
                     CvRect box;
                     CvRect _box;
+                    CvRect _box1;
                     
                     getBBFromUser(img, box, gui);
+                    getBBFromUser(img, _box, gui);
+                    
 
-                    if(getBBFromUser(img, _box, gui) == PROGRAM_EXIT)
+                    if(getBBFromUser(img, _box1, gui) == PROGRAM_EXIT)
                     {
                         break;
                     }
 
                     Rect r = Rect(box);
                     Rect _r = Rect(_box);
+                    Rect _r1 = Rect(_box1);
 
                     tld ->selectObject(grey, &r);
                     _tld ->selectObject(grey, &_r);
+                    _tld1->selectObject(grey, &_r1);
                 }
         
             }
@@ -319,6 +411,8 @@ void Main::doWork()
     if(exportModelAfterRun)
     {
         tld->writeToFile(modelExportFile);
+        _tld->writeToFile(modelExportFile);
+        _tld1->writeToFile(modelExportFile);
     }
 
     if(resultsFile)

@@ -43,6 +43,10 @@ public:
     tld::TLD *tld;
 
     tld::TLD *_tld;
+
+    tld::TLD *_tld1;
+
+    
     
     ImAcq *imAcq;
     tld::Gui *gui;
@@ -55,7 +59,11 @@ public:
     bool showForeground;
     bool showNotConfident;
     bool selectManually;
+
     int *initialBB;
+    int *initialBB1;
+    int *initialBB2;
+
     bool reinit;
     bool exportModelAfterRun;
     bool loadModel;
@@ -63,11 +71,16 @@ public:
     const char *modelExportFile;
     int seed;
 
+    int dem =0;
+
     Main()
     {
         tld = new tld::TLD();
 
         _tld = new tld::TLD();
+
+        _tld1 = new tld::TLD();
+        
         showOutput = 1;
         printResults = NULL;
         saveDir = ".";
@@ -80,6 +93,9 @@ public:
         selectManually = 0;
 
         initialBB = NULL;
+        initialBB1 = NULL;
+        initialBB2 = NULL;
+
         showNotConfident = true;
 
         reinit = 0;
@@ -92,13 +108,28 @@ public:
 
         gui = NULL;
         modelPath = NULL;
-        imAcq = NULL;
+        imAcq = NULL; if(key == 'a')
+                {
+                    tld->alternating = !tld->alternating;
+                    printf("alternating: %d\n", tld->alternating);
+                }
+
+                if(key == 'e')
+                {
+                    tld->writeToFile(modelExportFile);
+                }
+
+                if(key == 'i')
+                {
+                    tld->readFromFile(modelPath);
+                }
     }
 
     ~Main()
     {
         delete tld;
         delete _tld;
+        delete _tld1;
         imAcqFree(imAcq);
     }
 
